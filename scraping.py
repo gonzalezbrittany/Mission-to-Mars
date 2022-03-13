@@ -19,48 +19,46 @@ def scrape_all():
         "news_paragraph": news_paragraph,
         "featured_image": featured_image(browser),
         "facts": mars_facts(),
-        "last_modified": dt.datetime.now()
+        "last_modified": dt.datetime.now(),
+        "hemispheres": mars_hemispheres(browser)
     }
 
     # Stop webdriver and return data
     browser.quit()
     return data
 
+
 def mars_news(browser):
 
+    # Scrape Mars News
     # Visit the mars nasa news site
-    url = 'https://mars.nasa.gov/news/?page=0&per_page=40&order=publish_date+desc%2Ccreated_at+desc&search=&category=19%2C165%2C184%2C204&blank_scope=Latest'
+    url = 'https://data-class-mars.s3.amazonaws.com/Mars/index.html'
     browser.visit(url)
 
     # Optional delay for loading the page
     browser.is_element_present_by_css('div.list_text', wait_time=1)
 
-
-    # Convert the browser html to a soup object nd then quit the browser
+    # Convert the browser html to a soup object and then quit the browser
     html = browser.html
     news_soup = soup(html, 'html.parser')
 
     # Add try/except for error handling
     try:
         slide_elem = news_soup.select_one('div.list_text')
-
-
-        # Use the parent element to find the first `a` tag and save it as `news_title`
+        # Use the parent element to find the first 'a' tag and save it as 'news_title'
         news_title = slide_elem.find('div', class_='content_title').get_text()
-
         # Use the parent element to find the paragraph text
         news_p = slide_elem.find('div', class_='article_teaser_body').get_text()
+
     except AttributeError:
         return None, None
 
     return news_title, news_p
 
-# ## JPL Space Images Featured Image
 
 def featured_image(browser):
-
     # Visit URL
-    url = 'https://spaceimages-mars.com'
+    url = 'https://data-class-jpl-space.s3.amazonaws.com/JPL_Space/index.html'
     browser.visit(url)
 
     # Find and click the full image button
@@ -79,30 +77,81 @@ def featured_image(browser):
     except AttributeError:
         return None
 
-    # Use the base URL to create an absolute URL
-    img_url = f'https://spaceimages-mars.com/{img_url_rel}'
+    # Use the base url to create an absolute url
+    img_url = f'https://data-class-jpl-space.s3.amazonaws.com/JPL_Space/{img_url_rel}'
 
     return img_url
 
-# ## Mars Facts
 
 def mars_facts():
     # Add try/except for error handling
     try:
         # Use 'read_html' to scrape the facts table into a dataframe
-        df = pd.read_html('https://galaxyfacts-mars.com')[0]
+        df = pd.read_html('https://data-class-mars-facts.s3.amazonaws.com/Mars_Facts/index.html')[0]
 
     except BaseException:
         return None
-    df.columns=['description', 'Mars', 'Earth']
-    df.set_index('description', inplace=True)
 
-   # Convert dataframe into HTML format, add bootstrap
+    # Assign columns and set index of dataframe
+    df.columns=['Description', 'Mars', 'Earth']
+    df.set_index('Description', inplace=True)
+
+    # Convert dataframe into HTML format, add bootstrap
     return df.to_html(classes="table table-striped")
+
+
+def mars_hemispheres(browser):
+    # 1. Use browser to visit the URL 
+    url = 'https://marshemispheres.com/'
+
+    browser.visit(url)
+
+    # 2. Create a list to hold the images and titles.
+    hemisphere_image_urls = []
+
+    # 3. Write code to retrieve the image urls and titles for each hemisphere.
+    html = browser.html
+    list_soup = soup(html, 'html.parser')
+    mars_hemisphere = list_soup.find_all('div', class_='description')
+
+    for x in range(len(mars_hemisphere)):
+    
+        #create empty list
+        hemispheres = {}
+    
+        #click on link
+        browser.find_by_tag("h3")[x].click()
+
+        # Parse the resulting html with soup
+        html = browser.html
+        title_soup = soup(html, 'html.parser')
+    
+        # Find the title
+        title = title_soup.find("h2").text
+    
+        # Find the relative image url
+        image_soup = title_soup
+
+        image = (image_soup.find('div', class_='downloads')).find("ul").find("li").find("a")["href"]
+
+        # Create Full URL for each image
+        img_url = url+image
+    
+        #Save title and image URL
+        hemispheres["img_url"] = img_url
+        hemispheres["title"] = title
+    
+        #Append to list
+        hemisphere_image_urls.append(hemispheres)
+        browser.back()
+
+    # 4. Return the list that holds the dictionary of each image url and title.
+    return hemisphere_image_urls
+
+    # 5. Quit the browser
+    browser.quit()
 
 if __name__ == "__main__":
 
     # If running as script, print scraped data
     print(scrape_all())
-
-
